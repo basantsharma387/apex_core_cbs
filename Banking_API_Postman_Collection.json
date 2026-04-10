@@ -1,0 +1,43 @@
+{
+    "info": {
+        "name": "Banking API Collection",
+        "_postman_id": "12345",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Create Customer",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Authorization",
+                        "value": "Bearer {{token}}"
+                    },
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\"customerId\": \"CUST123\", \"name\": \"John Doe\"}"
+                },
+                "url": {
+                    "raw": "https://bankapi.com/api/v1/customer/create",
+                    "protocol": "https",
+                    "host": [
+                        "bankapi",
+                        "com"
+                    ],
+                    "path": [
+                        "api",
+                        "v1",
+                        "customer",
+                        "create"
+                    ]
+                }
+            }
+        }
+    ]
+}

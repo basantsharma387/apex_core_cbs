@@ -1,0 +1,602 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Apex Banking Platform — Prisma Schema
+// PostgreSQL 16 · Multi-tenant (row-level tenantId on every table)
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Tenants ───────────────────────────────────────────────────────────────────
+
+model Tenant {
+  id         String   @id @default(uuid())
+  name       String
+  code       String   @unique
+  country    String
+  currency   String   @default("USD")
+  timezone   String   @default("UTC")
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  users         User[]
+  customers     Customer[]
+  loans         Loan[]
+  loanApps      LoanApplication[]
+  ewsAlerts     EWSAlert[]
+  amlAlerts     AMLAlert[]
+  strReports    STRReport[]
+  documents     Document[]
+  cases         CollectionCase[]
+  ifrsStaging   IFRSStaging[]
+  auditLogs     AuditLog[]
+
+  @@map("tenants")
+}
+
+// ── Users (Staff) ─────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(uuid())
+  tenantId      String
+  email         String
+  passwordHash  String
+  name          String
+  role          UserRole  @default(LOAN_OFFICER)
+  branchId      String?
+  isActive      Boolean   @default(true)
+  failedAttempts Int      @default(0)
+  lockedUntil   DateTime?
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+  refreshTokens RefreshToken[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([tenantId, role])
+  @@index([tenantId, isActive])
+  @@map("users")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  RISK_ANALYST
+  COMPLIANCE_OFFICER
+  LOAN_OFFICER
+  CREDIT_ANALYST
+  BRANCH_MANAGER
+  COLLECTION_AGENT
+  COLLECTION_MANAGER
+  AUDITOR
+  CUSTOMER
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+// ── Customers ─────────────────────────────────────────────────────────────────
+
+model Customer {
+  id                     String      @id @default(uuid())
+  tenantId               String
+  customerId             String
+  fullName               String
+  email                  String
+  mobile                 String
+  nationalId             String
+  dateOfBirth            DateTime
+  address                String
+  city                   String
+  country                String
+  kycStatus              KYCStatus   @default(PENDING)
+  kycVerifiedAt          DateTime?
+  kycExpiresAt           DateTime?
+  riskGrade              String      @default("C")
+  relationshipManagerId  String?
+  branchId               String
+  createdBy              String
+  updatedBy              String?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+  deletedAt              DateTime?
+
+  tenant      Tenant          @relation(fields: [tenantId], references: [id])
+  loans       Loan[]
+  loanApps    LoanApplication[]
+  ewsAlerts   EWSAlert[]
+  amlAlerts   AMLAlert[]
+  documents   Document[]
+  cases       CollectionCase[]
+  portalUser  PortalUser?
+
+  @@unique([tenantId, customerId])
+  @@index([tenantId])
+  @@index([tenantId, kycStatus])
+  @@index([tenantId, branchId])
+  @@map("customers")
+}
+
+enum KYCStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+  REJECTED
+}
+
+// ── Portal Users (customer-facing login) ──────────────────────────────────────
+
+model PortalUser {
+  id             String    @id @default(uuid())
+  tenantId       String
+  customerId     String    @unique
+  email          String    @unique
+  passwordHash   String
+  isActive       Boolean   @default(true)
+  failedAttempts Int       @default(0)
+  lockedUntil    DateTime?
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  customer      Customer            @relation(fields: [customerId], references: [id])
+  refreshTokens PortalRefreshToken[]
+
+  @@index([tenantId])
+  @@map("portal_users")
+}
+
+model PortalRefreshToken {
+  id          String   @id @default(uuid())
+  portalUserId String
+  token       String   @unique
+  expiresAt   DateTime
+  isRevoked   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  portalUser  PortalUser @relation(fields: [portalUserId], references: [id], onDelete: Cascade)
+
+  @@index([portalUserId])
+  @@map("portal_refresh_tokens")
+}
+
+// ── Loans ─────────────────────────────────────────────────────────────────────
+
+model Loan {
+  id                 String     @id @default(uuid())
+  tenantId           String
+  loanId             String
+  customerId         String
+  applicationId      String?    @unique
+  productType        String
+  amount             Decimal    @db.Decimal(18, 2)
+  disbursedAmount    Decimal    @db.Decimal(18, 2) @default(0)
+  outstandingBalance Decimal    @db.Decimal(18, 2) @default(0)
+  interestRate       Decimal    @db.Decimal(5, 4)
+  tenureMonths       Int
+  dpd                Int        @default(0)
+  bucket             DPDBucket  @default(BUCKET_0_30)
+  stage              Int        @default(1)
+  status             LoanStatus @default(ACTIVE)
+  branchId           String
+  officerId          String
+  disbursedAt        DateTime?
+  maturityDate       DateTime?
+  createdBy          String
+  updatedBy          String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  customer    Customer     @relation(fields: [customerId], references: [id])
+  ewsAlerts   EWSAlert[]
+  cases       CollectionCase[]
+  ifrsStaging IFRSStaging[]
+  repayments  RepaymentSchedule[]
+
+  @@unique([tenantId, loanId])
+  @@index([tenantId])
+  @@index([tenantId, customerId])
+  @@index([tenantId, status])
+  @@index([tenantId, bucket])
+  @@index([tenantId, dpd])
+  @@map("loans")
+}
+
+enum LoanStatus {
+  ACTIVE
+  DISBURSED
+  CLOSED
+  NPA
+  RESTRUCTURED
+  WRITTEN_OFF
+}
+
+enum DPDBucket {
+  BUCKET_0_30   @map("0-30")
+  BUCKET_31_60  @map("31-60")
+  BUCKET_61_90  @map("61-90")
+  BUCKET_90_PLUS @map("90+")
+}
+
+model LoanApplication {
+  id                String    @id @default(uuid())
+  tenantId          String
+  applicationId     String
+  customerId        String
+  productType       String
+  purpose           String
+  requestedAmount   Decimal   @db.Decimal(18, 2)
+  requestedTenure   Int
+  approvedAmount    Decimal?  @db.Decimal(18, 2)
+  creditScore       Int?
+  pdScore           Decimal?  @db.Decimal(4, 3)
+  status            AppStatus @default(DRAFT)
+  officerId         String
+  reviewerId        String?
+  branchId          String
+  submittedAt       DateTime?
+  reviewedAt        DateTime?
+  comments          String?
+  createdBy         String
+  updatedBy         String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  customer  Customer @relation(fields: [customerId], references: [id])
+
+  @@unique([tenantId, applicationId])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, customerId])
+  @@map("loan_applications")
+}
+
+enum AppStatus {
+  DRAFT
+  SUBMITTED
+  SCORING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  DISBURSED
+}
+
+model RepaymentSchedule {
+  id          String    @id @default(uuid())
+  tenantId    String
+  loanId      String
+  installment Int
+  dueDate     DateTime
+  principal   Decimal   @db.Decimal(18, 2)
+  interest    Decimal   @db.Decimal(18, 2)
+  totalDue    Decimal   @db.Decimal(18, 2)
+  paidAmount  Decimal   @db.Decimal(18, 2) @default(0)
+  paidAt      DateTime?
+  status      String    @default("PENDING")
+
+  loan        Loan      @relation(fields: [loanId], references: [id])
+
+  @@index([loanId])
+  @@index([tenantId, dueDate])
+  @@map("repayment_schedules")
+}
+
+// ── EWS ───────────────────────────────────────────────────────────────────────
+
+model EWSAlert {
+  id                 String      @id @default(uuid())
+  tenantId           String
+  alertId            String
+  customerId         String
+  loanId             String
+  riskLevel          RiskLevel
+  pdScore            Decimal     @db.Decimal(4, 3)
+  indicators         String[]
+  dpd                Int
+  outstandingBalance Decimal     @db.Decimal(18, 2)
+  status             AlertStatus @default(OPEN)
+  assignedTo         String?
+  resolvedBy         String?
+  resolvedAt         DateTime?
+  resolution         String?
+  createdBy          String
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  customer  Customer @relation(fields: [customerId], references: [id])
+  loan      Loan     @relation(fields: [loanId], references: [id])
+
+  @@unique([tenantId, alertId])
+  @@index([tenantId])
+  @@index([tenantId, riskLevel])
+  @@index([tenantId, status])
+  @@index([tenantId, customerId])
+  @@map("ews_alerts")
+}
+
+enum RiskLevel {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum AlertStatus {
+  OPEN
+  ASSIGNED
+  RESOLVED
+  ESCALATED
+}
+
+// ── AML ───────────────────────────────────────────────────────────────────────
+
+model AMLAlert {
+  id          String    @id @default(uuid())
+  tenantId    String
+  alertId     String
+  txnId       String
+  customerId  String
+  amount      Decimal   @db.Decimal(18, 2)
+  currency    String    @db.Char(3)
+  country     String    @db.Char(2)
+  txnType     String
+  riskLevel   RiskLevel
+  riskScore   Int
+  reasons     String[]
+  status      AMLStatus @default(OPEN)
+  assignedTo  String?
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  customer  Customer @relation(fields: [customerId], references: [id])
+  strReport STRReport?
+
+  @@unique([tenantId, alertId])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, riskLevel])
+  @@map("aml_alerts")
+}
+
+enum AMLStatus {
+  OPEN
+  UNDER_REVIEW
+  CLEARED
+  FILED_STR
+  FILED_CTR
+}
+
+model STRReport {
+  id          String    @id @default(uuid())
+  tenantId    String
+  reportId    String
+  customerId  String
+  alertId     String    @unique
+  amount      Decimal   @db.Decimal(18, 2)
+  description String    @db.Text
+  filedBy     String
+  approvedBy  String?
+  status      STRStatus @default(DRAFT)
+  filedAt     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  alert   AMLAlert @relation(fields: [alertId], references: [id])
+
+  @@unique([tenantId, reportId])
+  @@index([tenantId])
+  @@map("str_reports")
+}
+
+enum STRStatus {
+  DRAFT
+  PENDING_APPROVAL
+  FILED
+  REJECTED
+}
+
+// ── DMS ───────────────────────────────────────────────────────────────────────
+
+model Document {
+  id               String    @id @default(uuid())
+  tenantId         String
+  docId            String
+  customerId       String
+  docType          DocType
+  fileName         String
+  fileSize         Int
+  mimeType         String
+  storageUrl       String
+  sha256Hash       String
+  ocrConfidence    Decimal?  @db.Decimal(4, 3)
+  ocrData          Json?
+  status           DocStatus @default(PENDING_OCR)
+  uploadedBy       String
+  reviewedBy       String?
+  reviewedAt       DateTime?
+  expiresAt        DateTime?
+  reviewComments   String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  customer  Customer @relation(fields: [customerId], references: [id])
+
+  @@unique([tenantId, docId])
+  @@unique([tenantId, sha256Hash])
+  @@index([tenantId])
+  @@index([tenantId, customerId])
+  @@index([tenantId, status])
+  @@index([tenantId, expiresAt])
+  @@map("documents")
+}
+
+enum DocType {
+  NATIONAL_ID
+  PASSPORT
+  DRIVING_LICENSE
+  ADDRESS_PROOF
+  INCOME_PROOF
+  BANK_STATEMENT
+  LOAN_FORM
+  PHOTO
+}
+
+enum DocStatus {
+  PENDING_OCR
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+// ── CMS ───────────────────────────────────────────────────────────────────────
+
+model CollectionCase {
+  id                String     @id @default(uuid())
+  tenantId          String
+  caseId            String
+  loanId            String
+  customerId        String
+  dpd               Int
+  bucket            DPDBucket
+  outstandingAmount Decimal    @db.Decimal(18, 2)
+  nba               NBA        @default(PHONE_CALL)
+  assignedAgentId   String?
+  status            CaseStatus @default(OPEN)
+  lastActivityAt    DateTime?
+  closedAt          DateTime?
+  createdBy         String
+  updatedBy         String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  customer  Customer @relation(fields: [customerId], references: [id])
+  loan      Loan     @relation(fields: [loanId], references: [id])
+  payments  Payment[]
+
+  @@unique([tenantId, caseId])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, assignedAgentId])
+  @@map("collection_cases")
+}
+
+enum NBA {
+  FIELD_VISIT
+  PHONE_CALL
+  SMS
+  EMAIL
+  LEGAL_NOTICE
+  RESTRUCTURE
+}
+
+enum CaseStatus {
+  OPEN
+  IN_PROGRESS
+  PAYMENT_RECEIVED
+  ESCALATED
+  CLOSED
+  WRITTEN_OFF
+}
+
+model Payment {
+  id          String   @id @default(uuid())
+  tenantId    String
+  paymentId   String
+  caseId      String
+  loanId      String
+  customerId  String
+  amount      Decimal  @db.Decimal(18, 2)
+  paymentMode String
+  receivedBy  String
+  gpsLat      Decimal? @db.Decimal(9, 6)
+  gpsLng      Decimal? @db.Decimal(9, 6)
+  receiptUrl  String?
+  createdAt   DateTime @default(now())
+
+  case  CollectionCase @relation(fields: [caseId], references: [id])
+
+  @@unique([tenantId, paymentId])
+  @@index([tenantId, caseId])
+  @@map("payments")
+}
+
+// ── IFRS 9 ────────────────────────────────────────────────────────────────────
+
+model IFRSStaging {
+  id           String   @id @default(uuid())
+  tenantId     String
+  loanId       String
+  customerId   String
+  stage        Int
+  pdScore      Decimal  @db.Decimal(4, 3)
+  lgd          Decimal  @db.Decimal(4, 3)
+  ead          Decimal  @db.Decimal(18, 2)
+  ecl          Decimal  @db.Decimal(18, 2)
+  batchId      String
+  calculatedAt DateTime @default(now())
+
+  tenant  Tenant @relation(fields: [tenantId], references: [id])
+  loan    Loan   @relation(fields: [loanId], references: [id])
+
+  @@index([tenantId, batchId])
+  @@index([tenantId, loanId])
+  @@map("ifrs_staging")
+}
+
+// ── Audit ─────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  tenantId    String
+  entityType  String
+  entityId    String
+  operation   String
+  before      Json?
+  after       Json?
+  userId      String
+  requestId   String?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  tenant  Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

@@ -1,0 +1,77 @@
+import type { Config } from 'tailwindcss'
+
+const config: Config = {
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  theme: {
+    extend: {
+      colors: {
+        // ── Brand ─────────────────────────────────────────────
+        brand: {
+          navy:     '#0D2B6A',  // sidebar, headers
+          blue:     '#1565C0',  // primary button / links / active nav pill
+          blueHover:'#104a94',
+          sky:      '#2196F3',  // accent — module label, highlights
+          skyLight: '#E3EFFF',  // accent bg — pills, hover states
+        },
+
+        // Tokenized aliases used throughout the app
+        sidebar:       '#0D2B6A',
+        'sidebar-hover':'#1A3B85',
+        'sidebar-text': '#A5C3EB',
+        action:        '#1565C0',
+        'action-hover':'#104a94',
+        'action-subtle':'#E3EFFF',
+
+        // ── Semantic ──────────────────────────────────────────
+        success: { DEFAULT: '#1D9E75', bg: '#E0F5EE' },
+        warning: { DEFAULT: '#EF9F27', bg: '#FAF0DC' },
+        danger:  { DEFAULT: '#E24B4A', bg: '#FCEBEB' },
+        purple:  { DEFAULT: '#7F77DD', bg: '#EEEDFE' },
+
+        // ── Neutrals ──────────────────────────────────────────
+        ink:     '#2C2C2A',
+        'ink-sub':'#5F5E5A',
+        sub:     '#5F5E5A',        // alias for ink-sub (legacy)
+        muted:   '#888780',
+        border:  '#D3D1C7',
+        borderMed:'#B9B7AE',
+        divider: '#F1EFE8',
+        raised:  '#F7F6F2',
+        surface: '#FFFFFF',
+        'surface-alt':'#F7F6F2',
+        page:    '#F1F4F8',
+
+        // ── Legacy aliases (kept so existing pages still compile)
+        ok:        { DEFAULT: '#1D9E75', bg: '#E0F5EE' },
+        warn:      { DEFAULT: '#EF9F27', bg: '#FAF0DC' },
+        risk:      { DEFAULT: '#E24B4A', bg: '#FCEBEB' },
+        actionLight: '#E3EFFF',
+        actionHover: '#104a94',
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Menlo', 'monospace'],
+      },
+      borderRadius: {
+        card:  '12px',
+        badge: '11px',
+        input: '8px',
+      },
+      fontSize: {
+        '2xs': ['10px', { lineHeight: '14px' }],
+        xs:   ['11px', { lineHeight: '16px' }],
+        sm:   ['12px', { lineHeight: '18px' }],
+        base: ['13px', { lineHeight: '20px' }],
+        md:   ['14px', { lineHeight: '22px' }],
+        lg:   ['16px', { lineHeight: '24px' }],
+        xl:   ['20px', { lineHeight: '28px' }],
+        '2xl':['28px', { lineHeight: '36px' }],
+      },
+      boxShadow: {
+        card: '0 1px 2px 0 rgba(16, 24, 40, 0.04)',
+      },
+    },
+  },
+  plugins: [],
+}
+export default config

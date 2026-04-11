@@ -1,0 +1,203 @@
+version: '3.9'
+
+services:
+  # ── Infrastructure ────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: apex_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: banking_dev
+    ports:
+      - '5433:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: apex_redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: apex_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: apex_kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - '9092:9092'
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: apex_kafka_ui
+    depends_on:
+      - kafka
+    ports:
+      - '8080:8080'
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+
+  # ── Microservices ─────────────────────────────────────────────────────────
+  gateway:
+    build: ./services/gateway
+    container_name: apex_gateway
+    ports:
+      - '3000:3000'
+    environment:
+      - NODE_ENV=development
+      - AUTH_SERVICE_URL=http://auth-service:3001
+      - LOAN_SERVICE_URL=http://loan-service:3002
+      - EWS_SERVICE_URL=http://ews-service:3003
+      - AML_SERVICE_URL=http://aml-service:3004
+      - DMS_SERVICE_URL=http://dms-service:3005
+      - CMS_SERVICE_URL=http://cms-service:3006
+      - IFRS9_SERVICE_URL=http://ifrs9-service:3007
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3009
+      - REPORT_SERVICE_URL=http://report-service:3010
+    depends_on:
+      - auth-service
+
+  auth-service:
+    build: ./services/auth-service
+    container_name: apex_auth
+    ports:
+      - '3001:3001'
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/banking_dev
+      - REDIS_URL=redis://redis:6379
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  loan-service:
+    build: ./services/loan-service
+    container_name: apex_loan
+    ports:
+      - '3002:3002'
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/banking_dev
+      - KAFKA_BROKERS=kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ews-service:
+    build: ./services/ews-service
+    container_name: apex_ews
+    ports:
+      - '3003:3003'
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/banking_dev
+      - KAFKA_BROKERS=kafka:9092
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  aml-service:
+    build: ./services/aml-service
+    container_name: apex_aml
+    ports:
+      - '3004:3004'
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/banking_dev
+      - KAFKA_BROKERS=kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  dms-service:
+    build: ./services/dms-service
+    container_name: apex_dms
+    ports:
+      - '3005:3005'
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/banking_dev
+      - KAFKA_BROKERS=kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  cms-service:
+    build: ./services/cms-service
+    container_name: apex_cms
+    ports:
+      - '3006:3006'
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/banking_dev
+      - KAFKA_BROKERS=kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ifrs9-service:
+    build: ./services/ifrs9-service
+    container_name: apex_ifrs9
+    ports:
+      - '3007:3007'
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/banking_dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  notification-service:
+    build: ./services/notification-service
+    container_name: apex_notification
+    ports:
+      - '3009:3009'
+    environment:
+      - NODE_ENV=development
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKERS=kafka:9092
+
+  report-service:
+    build: ./services/report-service
+    container_name: apex_report
+    ports:
+      - '3010:3010'
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/banking_dev
+
+volumes:
+  postgres_data:
+  redis_data:

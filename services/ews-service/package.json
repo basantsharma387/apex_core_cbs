@@ -1,0 +1,35 @@
+{
+  "name": "@apex/ews-service",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "express": "^4.19.0",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "morgan": "^1.10.0",
+    "zod": "^3.22.0",
+    "uuid": "^9.0.0",
+    "jsonwebtoken": "^9.0.0",
+    "kafkajs": "^2.2.4",
+    "ioredis": "^5.3.0",
+    "@prisma/client": "^5.12.0",
+    "@apex/shared": "workspace:*",
+    "@apex/logger": "workspace:*",
+    "@apex/middleware": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.0.0",
+    "prisma": "^5.12.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  }
+}

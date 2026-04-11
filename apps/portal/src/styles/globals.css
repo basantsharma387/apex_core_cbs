@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+  html {
+    font-size: 14px;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply font-sans text-ink antialiased bg-page;
+    font-feature-settings: 'cv02', 'cv03', 'cv04';
+    overscroll-behavior-y: none;
+  }
+  :focus-visible { outline: 2px solid theme('colors.action'); outline-offset: 2px; }
+  .tabular { font-variant-numeric: tabular-nums; }
+
+  /* Prevent iOS auto-zoom on input focus — inputs must be ≥16px font-size */
+  @media (max-width: 767px) {
+    input, select, textarea { font-size: 16px !important; }
+  }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-border rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-borderMed; }
+}
+
+@layer components {
+  /* ── Buttons ────────────────────────────────────────────────── */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 h-10 px-5 text-sm font-medium
+           text-white bg-action rounded-lg
+           hover:bg-actionHover transition-colors
+           focus:outline-none focus:ring-2 focus:ring-action/30 focus:ring-offset-1
+           disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 h-10 px-5 text-sm font-medium
+           text-ink bg-white border border-border rounded-lg
+           hover:border-borderMed hover:bg-surface transition-colors
+           focus:outline-none focus:ring-2 focus:ring-border
+           disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium
+           text-sub bg-transparent rounded-lg
+           hover:text-ink hover:bg-surface transition-colors;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 h-10 px-5 text-sm font-medium
+           text-white bg-risk rounded-lg hover:brightness-110 transition-all;
+  }
+
+  /* ── Forms ─────────────────────────────────────────────────── */
+  .portal-input {
+    @apply h-10 w-full px-3 text-sm text-ink bg-white border border-border rounded-lg
+           placeholder:text-muted
+           focus:outline-none focus:ring-2 focus:ring-action/20 focus:border-action
+           transition-colors;
+  }
+  .portal-select {
+    @apply portal-input appearance-none bg-white cursor-pointer;
+  }
+  .portal-textarea {
+    @apply w-full px-3 py-2.5 text-sm text-ink bg-white border border-border rounded-lg
+           placeholder:text-muted resize-none
+           focus:outline-none focus:ring-2 focus:ring-action/20 focus:border-action
+           transition-colors;
+  }
+  .portal-label {
+    @apply block text-xs font-medium text-ink mb-1.5;
+  }
+  .portal-error {
+    @apply text-xs text-risk mt-1.5;
+  }
+
+  /* ── Surfaces ──────────────────────────────────────────────── */
+  .portal-card {
+    @apply bg-white border border-border rounded-xl;
+  }
+
+  /* ── Status pills ──────────────────────────────────────────── */
+  .pill {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide;
+  }
+  .pill-success { @apply bg-ok-bg text-ok; }
+  .pill-warning { @apply bg-warn-bg text-warn; }
+  .pill-danger  { @apply bg-risk-bg text-risk; }
+  .pill-info    { @apply bg-blue-50 text-action; }
+  .pill-neutral { @apply bg-surface text-sub; }
+}

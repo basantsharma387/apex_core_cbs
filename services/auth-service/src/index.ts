@@ -82,6 +82,40 @@ app.get('/api/v1/auth/tenant', verifyJWT, asyncHandler(async (req, res) => {
   })
 }))
 
+app.patch('/api/v1/auth/tenant', verifyJWT, asyncHandler(async (req, res) => {
+  if (!['SUPER_ADMIN', 'ADMIN'].includes(req.user!.role)) {
+    res.status(403).json({ header: { status: 'ERROR', code: '403', message: 'Only ADMIN or SUPER_ADMIN may edit organisation details' }, body: null })
+    return
+  }
+  const body = z.object({
+    name:          z.string().min(2).optional(),
+    region:        z.string().min(2).optional(),
+    dataResidency: z.string().min(2).optional(),
+  }).parse(req.body)
+
+  const tenant = await prisma.tenant.update({
+    where: { id: req.user!.tenantId },
+    data: {
+      ...(body.name   ? { name: body.name }            : {}),
+      ...(body.region ? { country: body.region }        : {}),
+      ...(body.dataResidency && !body.region ? { country: body.dataResidency } : {}),
+    },
+  })
+
+  res.json({
+    header: { status: 'SUCCESS', code: '200', message: 'Tenant updated', requestId: '', timestamp: new Date().toISOString() },
+    body: {
+      id: tenant.id,
+      name: tenant.name,
+      code: tenant.code,
+      region: tenant.country,
+      dataResidency: tenant.country,
+      plan: 'Enterprise',
+      createdAt: tenant.createdAt,
+    },
+  })
+}))
+
 app.patch('/api/v1/auth/profile', verifyJWT, asyncHandler(async (req, res) => {
   const body = z.object({
     fullName: z.string().min(2).optional(),

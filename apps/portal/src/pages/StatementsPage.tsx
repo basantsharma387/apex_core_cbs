@@ -77,9 +77,32 @@ export default function StatementsPage() {
               <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
             </div>
           </div>
-          <button className="btn-secondary h-9 px-3 text-xs">
+          <button
+            onClick={() => {
+              if (!txns.length) return
+              const headers = ['Date', 'Description', 'Type', 'Debit', 'Credit', 'Balance']
+              const body = txns.map(t => [
+                new Date(t.date).toISOString().slice(0, 10),
+                `"${t.description.replace(/"/g, '""')}"`,
+                t.type,
+                t.debit ?? '',
+                t.credit ?? '',
+                t.balance,
+              ].join(','))
+              const csv = [headers.join(','), ...body].join('\n')
+              const blob = new Blob([csv], { type: 'text/csv' })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = `statement-${year}-${String(month + 1).padStart(2, '0')}.csv`
+              a.click()
+              URL.revokeObjectURL(url)
+            }}
+            disabled={!txns.length}
+            className="btn-secondary h-9 px-3 text-xs disabled:opacity-50"
+          >
             <Download size={12} />
-            Download PDF
+            Download statement
           </button>
         </div>
 

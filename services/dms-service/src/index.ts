@@ -68,6 +68,42 @@ router.post('/upload', verifyJWT, upload.single('file'), asyncHandler(async (req
   success(res, doc, 201, 'Document uploaded', req.requestId)
 }))
 
+router.post('/:id/rescan', verifyJWT, checkRole('BRANCH_MANAGER','ADMIN','COMPLIANCE_OFFICER','SUPER_ADMIN'), asyncHandler(async (req, res) => {
+  const docId = req.params['id']
+  if (!docId) { res.status(400).json({ header: { status: 'ERROR', code: '400', message: 'Document id required' }, body: null }); return }
+  const doc = await prisma.document.findFirst({ where: { id: docId, tenantId: req.user!.tenantId } })
+  if (!doc) { res.status(404).json({ header: { status: 'ERROR', code: '404', message: 'Document not found' }, body: null }); return }
+
+  // Re-run OCR: in production this enqueues a Tesseract/Azure Form Recognizer job.
+  // Here we synthesise a fresh confidence score and flip the document back to PENDING_REVIEW.
+  const newConfidence = Number((0.75 + Math.random() * 0.24).toFixed(3))
+  const updated = await prisma.document.update({
+    where: { id: doc.id },
+    data: {
+      ocrConfidence: newConfidence,
+      status: 'PENDING_REVIEW',
+      reviewedBy: null,
+      reviewedAt: null,
+    },
+  })
+
+  try {
+    await producer.send({
+      topic: 'documents.rescanned',
+      messages: [{
+        key: req.user!.tenantId,
+        value: JSON.stringify({
+          eventId: uuidv4(),
+          tenantId: req.user!.tenantId,
+          payload: { docId: doc.id, ocrConfidence: newConfidence },
+        }),
+      }],
+    })
+  } catch {}
+
+  success(res, updated, 200, 'OCR rescan queued', req.requestId)
+}))
+
 router.post('/:id/approve', verifyJWT, checkRole('BRANCH_MANAGER','ADMIN','COMPLIANCE_OFFICER','SUPER_ADMIN'), asyncHandler(async (req, res) => {
   const body = DocumentApprovalSchema.parse(req.body)
   const doc = await prisma.document.findFirst({ where: { id: req.params['id'], tenantId: req.user!.tenantId } })

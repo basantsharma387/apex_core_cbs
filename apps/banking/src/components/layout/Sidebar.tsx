@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, AlertTriangle, Shield, FileText, Briefcase, Package, BarChart2, FileBarChart, Settings, LogOut } from 'lucide-react'
+import { LayoutDashboard, AlertTriangle, Shield, FileText, Briefcase, Package, BarChart2, TrendingUp, FileBarChart, Settings, LogOut } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { api } from '@/api/client'
 
@@ -11,6 +11,7 @@ const NAV = [
   { label: 'Loan Apps',   path: '/los',       icon: Briefcase },
   { label: 'Collections', path: '/cms',       icon: Package },
   { label: 'IFRS 9',      path: '/ifrs9',     icon: BarChart2 },
+  { label: 'ALM / FTP',   path: '/alm',       icon: TrendingUp },
   { label: 'Reports',     path: '/reports',   icon: FileBarChart },
   { label: 'Settings',    path: '/settings',  icon: Settings },
 ]

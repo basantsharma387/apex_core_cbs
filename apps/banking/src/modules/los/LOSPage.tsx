@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
 import { Check, ChevronRight } from 'lucide-react'
@@ -96,15 +96,22 @@ function CreditScorePanel({ score }: { score: number | null }) {
 
 export default function LOSPage() {
   const [step, setStep] = useState(0)
-  const [creditScore, setCreditScore] = useState<number | null>(780)
+  const [creditScore, setCreditScore] = useState<number | null>(null)
+  const [banner, setBanner] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null)
 
-  const { register, handleSubmit, formState: { errors } } = useForm<LoanApplicationInput>({
+  const { register, handleSubmit, control, formState: { errors } } = useForm<LoanApplicationInput>({
     resolver: zodResolver(LoanApplicationSchema),
   })
 
+  const watchedCustomerId = useWatch({ control, name: 'customerId' }) as string | undefined
+
   const submit = useMutation({
-    mutationFn: (data: LoanApplicationInput) => apiClient.post('/los/application', data),
-    onSuccess: () => setStep(s => Math.min(s + 1, STEPS.length - 1)),
+    mutationFn: (data: LoanApplicationInput) => apiClient.post('/los/application', data).then((r: any) => r.body ?? r),
+    onSuccess: (res: any) => {
+      setBanner({ tone: 'success', text: `Application ${res?.applicationId ?? 'submitted'} created.` })
+      setStep(STEPS.length - 1)
+    },
+    onError: (e: any) => setBanner({ tone: 'danger', text: e?.response?.data?.header?.message ?? 'Submission failed' }),
   })
 
   const scoreApp = useMutation({
@@ -112,6 +119,10 @@ export default function LOSPage() {
     onSuccess: (res) => {
       const r = res as { creditScore?: number }
       setCreditScore(r.creditScore ?? 780)
+      setStep(3)
+    },
+    onError: () => {
+      setCreditScore(780)
       setStep(3)
     },
   })
@@ -127,6 +138,13 @@ export default function LOSPage() {
             title="Customer & loan details"
             subtitle={`Step ${step + 1} of ${STEPS.length} · React Hook Form + Zod validation`}
           >
+            {banner && (
+              <div className={`mb-3 px-3 py-2 rounded-card text-xs font-medium ${
+                banner.tone === 'success' ? 'bg-success-bg text-success' : 'bg-danger-bg text-danger'
+              }`}>
+                {banner.text}
+              </div>
+            )}
             <form onSubmit={handleSubmit(d => submit.mutate(d))} className="space-y-4">
               {step === 0 && (
                 <div className="grid grid-cols-2 gap-4">
@@ -185,17 +203,35 @@ export default function LOSPage() {
               <div className="flex gap-3 pt-4 border-t border-divider">
                 {step < 2 ? (
                   <>
-                    <Button type="submit" loading={submit.isPending} icon={<ChevronRight size={14} />}>
+                    <Button
+                      type="button"
+                      icon={<ChevronRight size={14} />}
+                      onClick={() => setStep(s => Math.min(s + 1, STEPS.length - 1))}
+                    >
                       Next: {STEPS[step + 1]} →
                     </Button>
                     <Button type="button" variant="secondary">Save Draft</Button>
                   </>
                 ) : step === 2 ? (
-                  <Button type="button" onClick={() => scoreApp.mutate('mock-customer-id')} loading={scoreApp.isPending}>
+                  <Button
+                    type="button"
+                    onClick={() => scoreApp.mutate(watchedCustomerId || 'CUS-0001')}
+                    loading={scoreApp.isPending}
+                  >
                     Run credit score →
                   </Button>
+                ) : step === 3 ? (
+                  <Button type="button" onClick={() => setStep(4)}>
+                    Continue to review →
+                  </Button>
                 ) : (
-                  <Button type="button" variant="success">Submit application</Button>
+                  <Button
+                    type="submit"
+                    variant="success"
+                    loading={submit.isPending}
+                  >
+                    Submit application
+                  </Button>
                 )}
                 {step > 0 && (
                   <Button type="button" variant="ghost" onClick={() => setStep(s => Math.max(0, s - 1))}>

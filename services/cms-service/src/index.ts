@@ -8,6 +8,7 @@ import { createLogger } from '@apex/logger'
 import { errorHandler, attachRequestId, verifyJWT, checkRole, asyncHandler, success, paginated } from '@apex/middleware'
 import { CaseAssignSchema, PaymentRecordSchema } from '@apex/shared'
 import { v4 as uuidv4 } from 'uuid'
+import { z } from 'zod'
 
 const logger = createLogger('cms-service')
 const PORT = process.env['CMS_SERVICE_PORT'] ?? 3006
@@ -57,6 +58,63 @@ router.post('/case', verifyJWT, checkRole('COLLECTION_MANAGER','ADMIN','SUPER_AD
   }})
   try { await producer.send({ topic: 'collection.case.created', messages: [{ key: req.user!.tenantId, value: JSON.stringify({ eventId: uuidv4(), tenantId: req.user!.tenantId, payload: { caseId: c.id } }) }] }) } catch {}
   success(res, c, 201, 'Case assigned', req.requestId)
+}))
+
+const CaseActionSchema = z.object({
+  action: z.enum(['FIELD_VISIT','PHONE_CALL','SMS','EMAIL','EMAIL_SMS','LEGAL_NOTICE','RESTRUCTURE']),
+  notes:  z.string().max(1000).optional(),
+})
+
+router.post('/case/:id/action', verifyJWT, checkRole('COLLECTION_AGENT','COLLECTION_MANAGER','ADMIN','SUPER_ADMIN','BRANCH_MANAGER'), asyncHandler(async (req, res) => {
+  const body = CaseActionSchema.parse(req.body)
+
+  // Accept either the DB primary key (uuid) or the business caseId like "CMS-123..."
+  const idParam = req.params['id']!
+  const existing = await prisma.collectionCase.findFirst({
+    where: {
+      tenantId: req.user!.tenantId,
+      OR: [{ id: idParam }, { caseId: idParam }],
+    },
+  })
+  if (!existing) {
+    res.status(404).json({ header: { status: 'ERROR', code: '404', message: 'Collection case not found' }, body: null })
+    return
+  }
+
+  // Map EMAIL_SMS (frontend alias) → SMS for the NBA enum
+  const mapped = body.action === 'EMAIL_SMS' ? 'SMS' : body.action
+
+  const updated = await prisma.collectionCase.update({
+    where: { id: existing.id },
+    data: {
+      nba: mapped as never,
+      status: 'IN_PROGRESS',
+      lastActivityAt: new Date(),
+      updatedBy: req.user!.sub,
+    },
+  })
+
+  try {
+    await producer.send({
+      topic: 'collection.case.action',
+      messages: [{
+        key: req.user!.tenantId,
+        value: JSON.stringify({
+          eventId: uuidv4(),
+          tenantId: req.user!.tenantId,
+          payload: {
+            caseId: updated.id,
+            businessCaseId: updated.caseId,
+            action: mapped,
+            triggeredBy: req.user!.sub,
+            notes: body.notes,
+          },
+        }),
+      }],
+    })
+  } catch {}
+
+  success(res, updated, 200, `Action ${mapped} triggered`, req.requestId)
 }))
 
 router.post('/payment', verifyJWT, checkRole('COLLECTION_AGENT','COLLECTION_MANAGER','ADMIN','SUPER_ADMIN'), asyncHandler(async (req, res) => {

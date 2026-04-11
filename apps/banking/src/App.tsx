@@ -13,6 +13,7 @@ const DMSPage    = lazy(() => import('@/modules/dms/DMSPage'))
 const LOSPage    = lazy(() => import('@/modules/los/LOSPage'))
 const CMSPage    = lazy(() => import('@/modules/cms/CMSPage'))
 const IFRS9Page  = lazy(() => import('@/modules/ifrs9/IFRS9Page'))
+const ALMPage    = lazy(() => import('@/modules/alm/ALMPage'))
 const ReportsPage = lazy(() => import('@/modules/reports/ReportsPage'))
 const SettingsPage = lazy(() => import('@/modules/settings/SettingsPage'))
 
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="/los/*"     element={<ProtectedRoute><LOSPage /></ProtectedRoute>} />
         <Route path="/cms/*"     element={<ProtectedRoute><CMSPage /></ProtectedRoute>} />
         <Route path="/ifrs9/*"   element={<ProtectedRoute><IFRS9Page /></ProtectedRoute>} />
+        <Route path="/alm/*"     element={<ProtectedRoute><ALMPage /></ProtectedRoute>} />
         <Route path="/reports/*" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
         <Route path="/settings/*"element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

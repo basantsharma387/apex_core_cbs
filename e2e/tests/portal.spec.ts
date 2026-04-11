@@ -4,6 +4,13 @@ const CREDS = { email: 'customer@demo.bank', password: 'Demo@123' }
 
 async function login(page: Page) {
   await page.goto('/login')
+  // Mobile carousel stage shows a "Get started" CTA after ~2 s. On desktop
+  // the form is always visible, so the CTA is hidden (`lg:hidden`) and we
+  // skip straight to filling the email field.
+  const getStarted = page.getByRole('button', { name: /get started/i })
+  if (await getStarted.isVisible({ timeout: 2_800 }).catch(() => false)) {
+    await getStarted.click()
+  }
   await page.getByPlaceholder('you@example.com').fill(CREDS.email)
   await page.getByPlaceholder('••••••••').fill(CREDS.password)
   await page.getByRole('button', { name: /sign in/i }).click()

@@ -5,6 +5,7 @@ import { usePortalAuthStore } from '@/store/authStore'
 const LoginPage       = lazy(() => import('./pages/LoginPage'))
 const DashboardPage   = lazy(() => import('./pages/DashboardPage'))
 const LoansPage       = lazy(() => import('./pages/LoansPage'))
+const LoanDetailPage  = lazy(() => import('./pages/LoanDetailPage'))
 const ApplyLoanPage   = lazy(() => import('./pages/ApplyLoanPage'))
 const DocumentsPage    = lazy(() => import('./pages/DocumentsPage'))
 const ProfilePage      = lazy(() => import('./pages/ProfilePage'))
@@ -31,7 +32,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
           <Route path="/loans" element={<RequireAuth><LoansPage /></RequireAuth>} />
-          <Route path="/loans/:loanId" element={<RequireAuth><LoansPage /></RequireAuth>} />
+          <Route path="/loans/:loanId" element={<RequireAuth><LoanDetailPage /></RequireAuth>} />
           <Route path="/apply" element={<RequireAuth><ApplyLoanPage /></RequireAuth>} />
           <Route path="/documents" element={<RequireAuth><DocumentsPage /></RequireAuth>} />
           <Route path="/profile"    element={<RequireAuth><ProfilePage /></RequireAuth>} />

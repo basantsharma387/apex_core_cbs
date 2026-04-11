@@ -16,7 +16,7 @@ export default defineConfig({
   projects: [
     {
       name: 'staff',
-      testMatch: /staff\.spec\.ts/,
+      testMatch: /staff(-detailed)?\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         baseURL: 'http://localhost:5173',
@@ -24,7 +24,7 @@ export default defineConfig({
     },
     {
       name: 'portal',
-      testMatch: /portal\.spec\.ts/,
+      testMatch: /portal(-detailed)?\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         baseURL: 'http://localhost:5174',

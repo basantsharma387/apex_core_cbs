@@ -146,15 +146,69 @@ function NotificationsTab() {
   )
 }
 
+const TenantSchema = z.object({
+  name: z.string().min(2),
+  region: z.string().optional(),
+  dataResidency: z.string().optional(),
+})
+type TenantForm = z.infer<typeof TenantSchema>
+
 function TenantTab() {
+  const role = useAuthStore(s => s.user?.role)
+  const canEdit = role === 'SUPER_ADMIN' || role === 'ADMIN'
+  const [editing, setEditing] = useState(false)
+
   const { data } = useQuery({
     queryKey: ['tenant-info'],
     queryFn: () => apiClient.get('/auth/tenant').then((r: any) => r.body),
   })
 
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<TenantForm>({
+    resolver: zodResolver(TenantSchema),
+    values: {
+      name: data?.name ?? '',
+      region: data?.region ?? '',
+      dataResidency: data?.dataResidency ?? 'India',
+    },
+  })
+
+  const mut = useMutation({
+    mutationFn: (d: TenantForm) => apiClient.patch('/auth/tenant', d),
+    onSuccess: () => { setEditing(false); reset() },
+  })
+
+  if (editing && canEdit) {
+    return (
+      <form onSubmit={handleSubmit(d => mut.mutate(d))} className="space-y-4 max-w-md">
+        <Field label="Organisation name" error={errors.name?.message}>
+          <input {...register('name')} className="input w-full" />
+        </Field>
+        <Field label="Region" error={errors.region?.message}>
+          <input {...register('region')} className="input w-full" placeholder="APAC / EMEA / US" />
+        </Field>
+        <Field label="Data residency" error={errors.dataResidency?.message}>
+          <input {...register('dataResidency')} className="input w-full" />
+        </Field>
+        <div className="flex gap-2 pt-2">
+          <button type="submit" disabled={mut.isPending} className="btn-primary">
+            {mut.isPending ? 'Saving…' : 'Save changes'}
+          </button>
+          <button type="button" onClick={() => setEditing(false)} className="btn-secondary">
+            Cancel
+          </button>
+        </div>
+        {mut.isError && <p className="text-[12px] text-red-600">Failed to update organisation details.</p>}
+      </form>
+    )
+  }
+
   return (
     <div className="space-y-4 max-w-md">
-      <p className="text-[12px] text-slate-500">Organisation details are managed by your SUPER_ADMIN. Contact your administrator to make changes.</p>
+      <p className="text-[12px] text-slate-500">
+        {canEdit
+          ? 'You can edit organisation details as an administrator.'
+          : 'Organisation details are managed by your SUPER_ADMIN. Contact your administrator to make changes.'}
+      </p>
       <div className="divide-y divide-gray-100 border border-gray-100 rounded-lg overflow-hidden">
         {[
           ['Organisation name', data?.name ?? '—'],
@@ -170,6 +224,11 @@ function TenantTab() {
           </div>
         ))}
       </div>
+      {canEdit && (
+        <button onClick={() => setEditing(true)} className="btn-primary">
+          Edit organisation
+        </button>
+      )}
     </div>
   )
 }
